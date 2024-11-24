@@ -1,15 +1,19 @@
 import socket
 import ssl
+import tkinter
 
-# TODO: EXERCISE 1-5
+# TODO: EXERCISE 1-6
 
 class URL:
     def __init__(self, url: str):
+        self.view_source = False
         if "://" in url:
             self.scheme, url = url.split("://", 1)
+            if self.scheme.startswith("view-source:"):
+                self.view_source = True
+                self.scheme = self.scheme[12:]
         else:
-            # TODO: IMPLEMENT VIEW SOURCE
-            assert url.startswith("data:") or url.startswith("view-source:")
+            assert url.startswith("data:")
             self.scheme = "data"
             self.dtype, self.data = url[5:].split(",", 1)
             assert self.dtype == "text/html"
@@ -66,9 +70,10 @@ class URL:
         elif self.scheme == "data":
             return self.data
 
-def show(body: str, view_source: bool = False):
+def show(body: str, view_source: bool):
     if view_source:
-        return body
+        print(body, end="")
+        return
     in_tag = False
     i = 0
     while i < len(body):
@@ -110,7 +115,7 @@ def show(body: str, view_source: bool = False):
 
 def load(url: URL):
     body = url.request()
-    show(body)
+    show(body, url.view_source)
 
 if __name__ == "__main__":
     import sys
