@@ -9,6 +9,7 @@ class URL:
         self.view_source = False
         self.socket = None
         self.socket_stream = None
+        self.request_cache = {}
         if "://" in url:
             self.scheme, url = url.split("://", 1)
             if self.scheme.startswith("view-source:"):
@@ -49,6 +50,12 @@ class URL:
                 self.socket = s
                 self.socket_stream = s.makefile("rb", newline="\r\n")
 
+            cached_response = self.get_cached_response()
+            if cached_response:
+                # TODO: IT'S NOT THIS SIMPLE, NEED TO RESPECT
+                #       CACHE-CONTROL HEADER
+                return cached_response[2]
+
             request = "GET {} HTTP/1.1\r\n".format(self.path)
             request += "Host: {}\r\n".format(self.host)
             request += "Connection: Keep-Alive\r\n" # By default, try to keep the connection alive
@@ -60,6 +67,7 @@ class URL:
 
             statusline = response.readline().decode("utf8")
             version, status, explanation = statusline.split(" ", 2)
+            status = int(status)
 
             response_headers = {}
             while True:
@@ -73,7 +81,6 @@ class URL:
             assert "content-encoding" not in response_headers
 
             assert version == "HTTP/1.1"
-            status = int(status)
             if status >= 300 and status < 400:
                 assert status != 300 and status != 306
                 assert status < 309
@@ -106,6 +113,15 @@ class URL:
             content = response.read(content_length).decode("utf8")
             if response_headers["connection"] == "close":
                 self.close()
+
+            if status == 200 or status == 404:
+                # TODO: CAN ONLY CACHE GET REQUESTS
+                # TODO: WE CAN ALSO CACHE OTHER CODES LIKE 301
+                #       BUT THAT IS HARDER BECAUSE
+                #       THEN WE HAVE TO CACHE THE RESOLVED RESPONSE
+                #       INSTEAD OF THE ORIGINAL REDIRECT RESPONSE
+                self.request_cache[(self.scheme, self.host, self.port, self.path)] = (statusline, response_headers, content)
+
             return content
         elif self.scheme == "file":
             # TODO: ERRORS
@@ -119,6 +135,14 @@ class URL:
         # for a given URL object will allow us to send multiple requests
         # to different paths on the same domain over the same socket
         self.path = path
+
+    def get_cached_response(self) -> tuple | None:
+        cached = None
+        try:
+            cached = self.request_cache[(self.scheme, self.host, self.port, self.path)]
+        except:
+            pass
+        return cached
 
     def close(self) -> None:
         if self.socket != None:
