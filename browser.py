@@ -2,11 +2,13 @@ import socket
 import ssl
 import tkinter
 
-# TODO: EXERCISE 1-6
+# TODO: EXERCISE 1-7
 
 class URL:
     def __init__(self, url: str):
         self.view_source = False
+        self.socket = None
+        self.socket_stream = None
         if "://" in url:
             self.scheme, url = url.split("://", 1)
             if self.scheme.startswith("view-source:"):
@@ -36,32 +38,47 @@ class URL:
 
     def request(self):
         if self.scheme in ["http", "https"]:
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP)
-            s.connect((self.host, self.port))
-            if self.scheme == "https":
-                ctx = ssl.create_default_context()
-                s = ctx.wrap_socket(s, server_hostname=self.host)
+            if self.socket != None:
+                s = self.socket
+            else:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP)
+                s.connect((self.host, self.port))
+                if self.scheme == "https":
+                    ctx = ssl.create_default_context()
+                    s = ctx.wrap_socket(s, server_hostname=self.host)
+                self.socket = s
+                self.socket_stream = s.makefile("rb", newline="\r\n")
 
             request = "GET {} HTTP/1.1\r\n".format(self.path)
             request += "Host: {}\r\n".format(self.host)
-            request += "Connection: close\r\n"
+            request += "Connection: Keep-Alive\r\n" # By default, try to keep the connection alive
             request += "User-Agent: PyBrowse-1.0\r\n"
             request += "\r\n"
             s.send(request.encode("utf8"))
 
-            response = s.makefile("r", encoding="utf8", newline="\r\n")
-            statusline = response.readline()
+            response = self.socket_stream
+            statusline = response.readline().decode("utf8")
             version, status, explanation = statusline.split(" ", 2)
             response_headers = {}
             while True:
-                line = response.readline()
+                line = response.readline().decode("utf8")
                 if line == "\r\n": break
                 header, value = line.split(":", 1)
                 response_headers[header.casefold()] = value.strip()
             assert "transfer-encoding" not in response_headers
             assert "content-encoding" not in response_headers
-            content = response.read()
-            s.close()
+            if response_headers["connection"] == "close":
+                # FIXME: WE ARE ASSUMING HERE THAT THE ENTIRE MESSAGE BODY
+                #        IS PRESENT AT THIS POINT IN THE STREAM INTEAD OF
+                #        READING CONTENT-LENGTH BYTES
+                content = response.read().decode("utf8")
+                self.socket_stream.close()
+                s.close()
+                self.socket = None
+                self.socket_stream = None
+            else:
+                content_length = int(response_headers["content-length"])
+                content = response.read(content_length).decode("utf8")
             return content
         elif self.scheme == "file":
             # TODO: ERRORS
@@ -120,7 +137,8 @@ def load(url: URL):
 if __name__ == "__main__":
     import sys
     if len(sys.argv) < 2:
-        url = "file://C:/Users/edwar/Desktop/example.html"
+        url = "file://example.html"
     else:
         url = sys.argv[1]
-    load(URL(url))
+    url_obj = URL(url)
+    load(url_obj)
