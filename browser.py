@@ -36,7 +36,7 @@ class URL:
         elif self.scheme == "file":
             self.path = url
 
-    def request(self):
+    def request(self) -> str:
         if self.scheme in ["http", "https"]:
             if self.socket != None:
                 s = self.socket
@@ -86,6 +86,19 @@ class URL:
                 return f.read()
         elif self.scheme == "data":
             return self.data
+
+    def set_path(self, path: str) -> None:
+        # Sockets merely connect to a given domain, so changing the path
+        # for a given URL object will allow us to send multiple requests
+        # to different paths on the same domain over the same socket
+        self.path = path
+
+    def close(self) -> None:
+        if self.socket != None:
+            self.socket_stream.close()
+            self.socket.close()
+            self.socket = None
+            self.socket_stream = None
 
 def show(body: str, view_source: bool):
     if view_source:
