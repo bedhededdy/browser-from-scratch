@@ -2,7 +2,7 @@ import socket
 import ssl
 import tkinter
 
-# TODO: EXERCISE 1-7
+# TODO: EXERCISE 1-8
 
 class URL:
     def __init__(self, url: str):
@@ -36,7 +36,7 @@ class URL:
         elif self.scheme == "file":
             self.path = url
 
-    def request(self) -> str:
+    def request(self, nredirects = 0) -> str:
         if self.scheme in ["http", "https"]:
             if self.socket != None:
                 s = self.socket
@@ -57,28 +57,55 @@ class URL:
             s.send(request.encode("utf8"))
 
             response = self.socket_stream
+
             statusline = response.readline().decode("utf8")
             version, status, explanation = statusline.split(" ", 2)
+
             response_headers = {}
             while True:
                 line = response.readline().decode("utf8")
                 if line == "\r\n": break
                 header, value = line.split(":", 1)
                 response_headers[header.casefold()] = value.strip()
+
+            # TODO: REMOVE ME ONCE WE ACCEPT THIS
             assert "transfer-encoding" not in response_headers
             assert "content-encoding" not in response_headers
+
+            assert version == "HTTP/1.1"
+            status = int(status)
+            if status >= 300 and status < 400:
+                assert status != 300 and status != 306
+                assert status < 309
+                if status != 304:
+                    new_url: str = response_headers["location"]
+                    if nredirects == 10:
+                        # Do not exceed 10 redirects
+                        self.close()
+                        return "ERROR: TOO MANY REDIRECTS"
+                    if new_url.startswith("/"):
+                        self.set_path(new_url)
+                        # FIXME: ASSUMING CONTENT-LENGTH IS SENT
+                        response.read(int(response_headers["content-length"]))
+                    else:
+                        new_url_obj = URL(new_url)
+                        if new_url_obj.scheme != self.scheme or new_url_obj.host != self.host or new_url_obj.port != self.port:
+                            self.close()
+                            # FIXME: NOT GOOD, SERVER COULD TELL US TO OPEN LOCAL FILE AND CRASH
+                            self.scheme = new_url_obj.scheme
+                            self.host = new_url_obj.host
+                            self.port = new_url_obj.port
+                        else:
+                            # FIXME: ASSUMING CONTENT-LENGTH IS SENT
+                            response.read(int(response_headers["content-length"]))
+                        self.set_path(new_url_obj.path)
+                    return self.request(nredirects + 1)
+
+            # FIXME: ASSUMING CONTENT-LENGTH IS SENT
+            content_length = int(response_headers["content-length"])
+            content = response.read(content_length).decode("utf8")
             if response_headers["connection"] == "close":
-                # FIXME: WE ARE ASSUMING HERE THAT THE ENTIRE MESSAGE BODY
-                #        IS PRESENT AT THIS POINT IN THE STREAM INTEAD OF
-                #        READING CONTENT-LENGTH BYTES
-                content = response.read().decode("utf8")
-                self.socket_stream.close()
-                s.close()
-                self.socket = None
-                self.socket_stream = None
-            else:
-                content_length = int(response_headers["content-length"])
-                content = response.read(content_length).decode("utf8")
+                self.close()
             return content
         elif self.scheme == "file":
             # TODO: ERRORS
