@@ -112,7 +112,7 @@ class HTTPConnection:
             raw_content = self.socket_stream.read(int(response_headers["content-length"]))
             if "content-encoding" in response_headers:
                 assert response_headers["content-encoding"].casefold() == "gzip"
-                gzip.decompress(raw_content)
+                raw_content = gzip.decompress(raw_content)
             return raw_content.decode("utf8")
 
     def __read_http_chunks(self, content_encoding: str | None = None) -> str:
