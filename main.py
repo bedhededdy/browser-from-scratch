@@ -5,7 +5,7 @@ from URL import URL
 from HTTPConnection import HTTPConnection
 from Browser import Browser
 
-# TODO: EXERCISE 1-8
+# TODO: EXERCISE 1-9
 # TODO: EXERCISE 2-3
 
 def main():
@@ -13,7 +13,8 @@ def main():
         url = URL("file://example.html")
     else:
         url = URL(sys.argv[1])
-    Browser().load(url)
+    browser = Browser()
+    browser.load(url)
     tk.mainloop()
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 from io import BufferedReader
 import ssl
 import socket
+from typing import Dict
 
 from HTTPRequestCache import HTTPRequestCache
 from URL import URL
@@ -54,7 +55,7 @@ class HTTPConnection:
         version, status, explanation = status_line.split(" ", 2)
         status = int(status)
 
-        response_headers = {}
+        response_headers: Dict[str, str] = {}
         while True:
             line = response.readline().decode("utf8")
             if line == "\r\n": break
@@ -94,13 +95,16 @@ class HTTPConnection:
         # FIXME: ASSUMING CONTENT-LENGTH IS SENT
         content_length = int(response_headers["content-length"])
         content = response.read(content_length).decode("utf8")
-        if response_headers["connection"] == "close":
+        if "connection" in response_headers and response_headers["connection"].casefold() == "close":
             self.close()
 
         if self.cache and (status == 200 or status == 404 or status == 301):
             # TODO: CAN ONLY CACHE GET REQUESTS
             # TODO: CAN POTENTIALLY CACHE MORE REQUESTS
-            self.cache.set_cached_request(self.url, content)
+            if "cache-control" in response_headers:
+                cache_control = response_headers["cache-control"].casefold()
+                if cache_control.startswith("max-age"):
+                    self.cache.set_cached_request(self.url, content, int(cache_control.split("=", 1)[1]))
 
         return content
 

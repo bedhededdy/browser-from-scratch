@@ -43,6 +43,10 @@ class URL:
     def secure(self) -> bool:
         return self.scheme == "https"
 
+    def __str__(self) -> str:
+        # TODO: DOESN'T HANDLE VIEW-SOURCE
+        return "{}://{}:{}{}".format(self.scheme, self.host, self.port, self.path)
+
     def __hash__(self) -> int:
         # TODO: CAN WE CACHE HTTP/HTTPS INTERCHANGEABLY?
         return hash((self.scheme, self.host, self.port, self.path))

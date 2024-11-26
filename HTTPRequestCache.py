@@ -1,3 +1,4 @@
+from time import time
 from typing import Dict
 
 from URL import URL
@@ -8,11 +9,15 @@ class HTTPRequestCache:
 
     def get_cached_request(self, url: URL) -> str | None:
         if url in self.cache:
-            return self.cache[url]
+            cache_unix_time, expiry, content = self.cache[url]
+            if int(time()) - cache_unix_time >= expiry:
+                self.clear_cached_request(url)
+                return None
+            return content
         return None
 
-    def set_cached_request(self, url: URL, content: str) -> None:
-        self.cache[url] = content
+    def set_cached_request(self, url: URL, content: str, expiry: int) -> None:
+        self.cache[url] = (int(time()), expiry, content)
 
     def clear_cached_request(self, url: URL) -> None:
         if url in self.cache:
