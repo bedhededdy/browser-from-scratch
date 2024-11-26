@@ -1,3 +1,4 @@
+import gzip
 from io import BufferedReader
 import ssl
 import socket
@@ -42,10 +43,11 @@ class HTTPConnection:
             if cached_response:
                 return cached_response
 
-        request = "GET {} HTTP/1.1\r\n".format(self.url.path)
+        request =  "GET {} HTTP/1.1\r\n".format(self.url.path)
         request += "Host: {}\r\n".format(self.url.host)
         request += "Connection: Keep-Alive\r\n"
         request += "User-Agent: PyBrowse-1.0\r\n"
+        request += "Accept-Encoding: gzip\r\n"
         request += "\r\n"
         self.socket.send(request.encode("utf8"))
 
@@ -62,10 +64,6 @@ class HTTPConnection:
             header, value = line.split(":", 1)
             response_headers[header.casefold()] = value.strip()
 
-        # TODO: REMOVE ME ONCE WE ACCEPT THIS
-        assert "transfer-encoding" not in response_headers
-        assert "content-encoding" not in response_headers
-
         assert version == "HTTP/1.1"
         if status >= 300 and status < 400:
             assert status != 300 and status != 306
@@ -78,8 +76,7 @@ class HTTPConnection:
                     return "ERROR: TOO MANY REDIRECTS"
                 if new_url_str.startswith("/"):
                     self.set_path(new_url_str)
-                    # FIXME: ASSUMING CONTENT-LENGTH IS SENT
-                    response.read(int(response_headers["content-length"]))
+                    self.__read_http_content(response_headers)
                 else:
                     new_url_obj = URL(new_url_str)
                     if new_url_obj.scheme != self.url.scheme or new_url_obj.host != self.url.host or new_url_obj.port != self.url.port:
@@ -87,14 +84,12 @@ class HTTPConnection:
                         assert new_url_obj.scheme in ["http", "https"]
                         self.url = new_url_obj
                     else:
-                        # FIXME: ASSUMING CONTENT-LENGTH IS SENT
-                        response.read(int(response_headers["content-length"]))
+                        self.__read_http_content(response_headers)
                         self.set_path(new_url_obj.path)
                 return self.__http_request(base_url, nredirects + 1)
 
-        # FIXME: ASSUMING CONTENT-LENGTH IS SENT
-        content_length = int(response_headers["content-length"])
-        content = response.read(content_length).decode("utf8")
+        content = self.__read_http_content(response_headers)
+
         if "connection" in response_headers and response_headers["connection"].casefold() == "close":
             self.close()
 
@@ -107,6 +102,32 @@ class HTTPConnection:
                     self.cache.set_cached_request(self.url, content, int(cache_control.split("=", 1)[1]))
 
         return content
+
+    def __read_http_content(self, response_headers: Dict[str, str]) -> str:
+        if "transfer-encoding" in response_headers:
+            assert response_headers["transfer-encoding"].casefold() == "chunked"
+            return self.__read_http_chunks(response_headers.get("content-encoding", None))
+        else:
+            assert "content-length" in response_headers
+            raw_content = self.socket_stream.read(int(response_headers["content-length"]))
+            if "content-encoding" in response_headers:
+                assert response_headers["content-encoding"].casefold() == "gzip"
+                gzip.decompress(raw_content)
+            return raw_content.decode("utf8")
+
+    def __read_http_chunks(self, content_encoding: str | None = None) -> str:
+        content = bytes()
+        while True:
+            content_length = self.socket_stream.readline().decode("utf8").strip()
+            if content_length != "": content_length = int(content_length, 16)
+            else: content_length = 0
+            if content_length == 0:
+                self.socket_stream.readline()
+                break
+            content += self.socket_stream.read(content_length)
+        if content_encoding == "gzip":
+            content = gzip.decompress(content)
+        return content.decode("utf8")
 
     def __data_request(self) -> str:
         return self.url.data

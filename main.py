@@ -5,7 +5,6 @@ from URL import URL
 from HTTPConnection import HTTPConnection
 from Browser import Browser
 
-# TODO: EXERCISE 1-9
 # TODO: EXERCISE 2-3
 
 def main():
