@@ -80,7 +80,7 @@ class Browser:
         self.window.bind("<Up>", self.scrollup)
 
         self.platform = platform.system()
-        if platform == "Linux":
+        if self.platform == "Linux":
             self.window.bind("<Button-4>", self.scrollup)
             self.window.bind("<Button-5>", self.scrolldown)
         else:
