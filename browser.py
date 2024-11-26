@@ -1,6 +1,6 @@
 import socket
 import ssl
-import tkinter
+import tkinter as tk
 
 # TODO: EXERCISE 1-8
 
@@ -151,10 +151,10 @@ class URL:
             self.socket = None
             self.socket_stream = None
 
-def show(body: str, view_source: bool):
+def lex(body: str, view_source: bool):
     if view_source:
-        print(body, end="")
-        return
+        return body
+    text = ""
     in_tag = False
     i = 0
     while i < len(body):
@@ -175,28 +175,65 @@ def show(body: str, view_source: bool):
                     break
                 elif body[i] == " ":
                     # Wasn't an entity
-                    print(c + entity + " ", end="")
+                    text += c + entity + " "
                 elif body[i] == "<":
-                    print(c + entity, end="")
+                    text += c + entity
                     # Have to do this so that we hit the tag open in next
                     # loop iteration
                     i -= 1
                 elif body[i] == ";":
                     # Potentially an entity
                     if entity == "lt":
-                        print("<", end="")
+                        text += "<"
                     elif entity == "gt":
-                        print(">", end="")
+                        text += ">"
                     else:
                         # Not a valid entity, so just print the raw text
-                        print(c + entity + ";", end="")
+                        text += c + entity + ";"
             else:
-                print(c, end="")
+                text += c
         i += 1
+    return text
 
-def load(url: URL):
-    body = url.request()
-    show(body, url.view_source)
+WIDTH, HEIGHT = 800, 600
+HSTEP, VSTEP = 13, 18
+SCROLL_STEP = 100
+
+def layout(text, view_source):
+    display_list = []
+    cursor_x, cursor_y = HSTEP, VSTEP
+    for c in lex(text, view_source):
+        display_list.append((cursor_x, cursor_y, c))
+        cursor_x += HSTEP
+        if cursor_x >= WIDTH - HSTEP:
+            cursor_x = HSTEP
+            cursor_y += VSTEP
+    return display_list
+
+class Browser:
+    def __init__(self):
+        self.window = tk.Tk()
+        self.canvas = tk.Canvas(self.window, width=WIDTH, height=HEIGHT)
+        self.canvas.pack()
+        self.scroll = 0
+        self.window.bind("<Down>", self.scrolldown)
+
+    def load(self, url: URL):
+        body = url.request()
+        text = lex(body, url.view_source)
+        self.display_list = layout(text, url.view_source)
+        self.draw()
+
+    def draw(self):
+        self.canvas.delete("all")
+        for x, y, c, in self.display_list:
+            if y > self.scroll + HEIGHT: continue
+            if y + VSTEP < self.scroll: continue
+            self.canvas.create_text(x, y - self.scroll, text=c)
+
+    def scrolldown(self, e):
+        self.scroll += SCROLL_STEP
+        self.draw()
 
 if __name__ == "__main__":
     import sys
@@ -205,4 +242,5 @@ if __name__ == "__main__":
     else:
         url = sys.argv[1]
     url_obj = URL(url)
-    load(url_obj)
+    Browser().load(url_obj)
+    tk.mainloop()
