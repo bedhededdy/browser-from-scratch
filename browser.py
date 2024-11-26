@@ -4,7 +4,7 @@ import tkinter as tk
 import platform
 
 # TODO: EXERCISE 1-8
-# TODO: EXERCISE 2-1 (2-2 IS ALREADY DONE)
+# TODO: EXERCISE 2-3
 
 class URL:
     def __init__(self, url: str):
@@ -205,6 +205,10 @@ def layout(text, view_source):
     display_list = []
     cursor_x, cursor_y = HSTEP, VSTEP
     for c in lex(text, view_source):
+        if c == "\n":
+            cursor_x = HSTEP
+            cursor_y += VSTEP
+            continue
         display_list.append((cursor_x, cursor_y, c))
         cursor_x += HSTEP
         if cursor_x >= WIDTH - HSTEP:
