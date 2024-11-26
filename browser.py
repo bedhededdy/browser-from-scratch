@@ -1,8 +1,10 @@
 import socket
 import ssl
 import tkinter as tk
+import platform
 
 # TODO: EXERCISE 1-8
+# TODO: EXERCISE 2-1 (2-2 IS ALREADY DONE)
 
 class URL:
     def __init__(self, url: str):
@@ -217,6 +219,14 @@ class Browser:
         self.canvas.pack()
         self.scroll = 0
         self.window.bind("<Down>", self.scrolldown)
+        self.window.bind("<Up>", self.scrollup)
+
+        self.platform = platform.system()
+        if self.platform == "Linux":
+            self.window.bind("<Button-4>", self.scrollup)
+            self.window.bind("<Button-5>", self.scrolldown)
+        else:
+            self.window.bind("<MouseWheel>", self.mousescroll)
 
     def load(self, url: URL):
         body = url.request()
@@ -234,6 +244,17 @@ class Browser:
     def scrolldown(self, e):
         self.scroll += SCROLL_STEP
         self.draw()
+
+    def scrollup(self, e):
+        self.scroll -= SCROLL_STEP
+        if self.scroll < 0: self.scroll = 0
+        self.draw()
+
+    def mousescroll(self, e):
+        if self.platform == "Windows":
+            self.scroll += (e.delta // 120) * VSTEP
+        elif self.platform == "Darwin":
+            self.scroll += e.delta * VSTEP
 
 if __name__ == "__main__":
     import sys
