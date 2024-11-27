@@ -111,6 +111,8 @@ class Browser:
 
     def mousescroll(self, e) -> None:
         if self.platform == "Windows":
-            self.scroll += (e.delta // 120) * self.VSTEP
+            self.scroll -= (e.delta // 120) * self.VSTEP
         elif self.platform == "Darwin":
             self.scroll += e.delta * self.VSTEP
+        if self.scroll < 0: self.scroll = 0
+        self.draw()
