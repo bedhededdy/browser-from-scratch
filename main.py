@@ -5,7 +5,7 @@ from URL import URL
 from HTTPConnection import HTTPConnection
 from Browser import Browser
 
-# TODO: EXERCISE 2-3
+# TODO: EXERCISE 2-4
 
 def main():
     if len(sys.argv) < 2:
