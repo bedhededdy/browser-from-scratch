@@ -1,13 +1,36 @@
 import platform
 import tkinter as tk
-from time import time
-from typing import List, Tuple
+from typing import List
 
 from HTTPConnection import HTTPConnection
 from HTTPRequestCache import HTTPRequestCache
+from Layout import Layout
+from Tag import Tag
+from Text import Text
 from URL import URL
 
-def lex(body: str, view_source: bool) -> str:
+def lex(body: str, view_source: bool) -> List[Tag | Text]:
+    out = []
+    buffer = ""
+    in_tag = False
+    for c in body:
+        if c == "<":
+            # TODO: HAVE TO ADD THE ENTITY DETECTION BACK IN
+            #       (DO IT AFTER GETTING THE WHOLE ASS BUFFER)
+            in_tag = True
+            if buffer: out.append(Text(buffer))
+            buffer = ""
+        elif c == ">":
+            in_tag = False
+            out.append(Tag(buffer))
+            buffer = ""
+        else:
+            buffer += c
+    if not in_tag and buffer:
+        out.append(Text(buffer))
+    return out
+
+def __old_lex(body: str, view_source: bool) -> str:
     if view_source:
         return body
     text = ""
@@ -53,7 +76,6 @@ def lex(body: str, view_source: bool) -> str:
 
 class Browser:
     INITIAL_WIDTH, INITIAL_HEIGHT = 800, 600
-    HSTEP, VSTEP = 13, 18
     SCROLL_STEP = 100
 
     def __init__(self):
@@ -63,7 +85,6 @@ class Browser:
         self.width = self.INITIAL_WIDTH
         self.height = self.INITIAL_HEIGHT
         self.scroll = 0
-        self.content_height = 0
 
         self.platform = platform.system()
         if self.platform == "Linux":
@@ -76,48 +97,23 @@ class Browser:
 
         self.window.bind("<Configure>", self.resize)
 
-        self.canvas.tag_bind("scrollbar", "<Button-1>", self.start_scroll)
-        self.canvas.tag_bind("scrollbar", "<B1-Motion>", self.do_scroll)
-        self.canvas.tag_bind("scrollbar", "<ButtonRelease-1>", self.end_scroll)
-
     def move_scroll(self, delta: int) -> None:
         self.scroll += delta
         if self.scroll < 0: self.scroll = 0
-        elif self.scroll + self.height > self.content_height: self.scroll = self.content_height - self.height
-
-    def start_scroll(self, e: tk.Event) -> None:
-        self.start_scroll_y = e.y
-        self.calls_since_last_draw = 0
-
-    def do_scroll(self, e: tk.Event) -> None:
-        delta = e.y  - self.start_scroll_y
-        self.move_scroll(delta)
-        self.calls_since_last_draw += 1
-        if self.calls_since_last_draw == 20:
-            # FIXME: CALLING DRAW UNBINDS THIS FROM THE ORIGINAL OBJECT
-            #        AND SO WE NEVER GET CALLED AGAIN
-            #        EVEN IF WE REBIND THE TAGS IN THE DRAW CALL
-            #        WE WOULD NEED TO START PERSISTING OBJECTS BETWEEN FRAMES
-            #        TO FIX THIS INSTEAD OF DELETING ALL IN THE DRAW CALL
-            self.draw()
-            self.calls_since_last_draw = 0
-
-    def end_scroll(self, e: tk.Event) -> None:
-        self.start_scroll_y = None
-        self.calls_since_last_draw = 0
+        elif self.scroll + self.height > self.layout.content_height: self.scroll = max(self.layout.content_height - self.height, 0)
 
     def load(self, url: URL) -> None:
         conn = HTTPConnection(url, HTTPRequestCache())
         body = conn.request()
-        self.text = lex(body, url.view_source)
-        self.display_list = self.layout()
+        self.tokens = lex(body, url.view_source)
+        self.layout = Layout(self.tokens, self.width)
         self.draw()
 
     def draw_scrollbar(self) -> None:
-        if self.content_height == 0:
+        if self.layout.content_height == 0:
             return
 
-        viewport_height = self.content_height
+        viewport_height = self.layout.content_height
         visible_viewport_height = self.height
         visible_viewport_percentage = visible_viewport_height / viewport_height
         viewport_start_percentage = self.scroll / viewport_height
@@ -133,17 +129,14 @@ class Browser:
         if visible_viewport_percentage >= 1.0:
             return
 
-        self.canvas.create_rectangle(self.width - self.HSTEP, scrollbar_start_height, self.width, scrollbar_end_height, fill="blue", tags="scrollbar")
-        self.canvas.tag_bind("scrollbar", "<Button-1>", self.start_scroll)
-        self.canvas.tag_bind("scrollbar", "<B1-Motion>", self.do_scroll)
-        self.canvas.tag_bind("scrollbar", "<ButtonRelease-1>", self.end_scroll)
+        self.canvas.create_rectangle(self.width - Layout.HSTEP, scrollbar_start_height, self.width, scrollbar_end_height, fill="blue", tags="scrollbar")
 
     def draw(self) -> None:
         self.canvas.delete("all")
-        for x, y, c in self.display_list:
+        for x, y, c, font in self.layout.display_list:
             if y > self.scroll + self.height: continue
-            if y + self.VSTEP < self.scroll: continue
-            self.canvas.create_text(x, y - self.scroll, text=c)
+            if y + Layout.VSTEP < self.scroll: continue
+            self.canvas.create_text(x, y - self.scroll, text=c, anchor="nw", font=font)
         self.draw_scrollbar()
 
     def scrolldown(self, e: tk.Event) -> None:
@@ -156,31 +149,13 @@ class Browser:
 
     def mousescroll(self, e: tk.Event) -> None:
         if self.platform == "Windows":
-            self.move_scroll(-((e.delta // 120) * self.VSTEP))
+            self.move_scroll(-((e.delta // 120) * Layout.VSTEP))
         elif self.platform == "Darwin":
-            self.move_scroll(e.delta * self.VSTEP)
+            self.move_scroll(e.delta * Layout.VSTEP)
         self.draw()
 
     def resize(self, e: tk.Event) -> None:
         self.width = e.width
         self.height = e.height
-        self.display_list = self.layout()
+        self.layout = Layout(self.tokens, self.width)
         self.draw()
-
-    def layout(self) -> List[Tuple[int, int, str]]:
-        display_list = []
-        self.content_height = 0
-        cursor_x, cursor_y = Browser.HSTEP, Browser.VSTEP
-        for c in self.text:
-            if c == "\n":
-                cursor_x = Browser.HSTEP
-                cursor_y += Browser.VSTEP
-                self.content_height = max(cursor_y, self.content_height)
-                continue
-            display_list.append((cursor_x, cursor_y, c))
-            cursor_x += Browser.HSTEP
-            if cursor_x >= self.width - Browser.HSTEP:
-                cursor_x = Browser.HSTEP
-                cursor_y += Browser.VSTEP
-            self.content_height = max(cursor_y, self.content_height)
-        return display_list

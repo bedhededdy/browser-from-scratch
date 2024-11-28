@@ -2,10 +2,10 @@ import sys
 import tkinter as tk
 
 from URL import URL
-from HTTPConnection import HTTPConnection
 from Browser import Browser
 
 # TODO: EXERCISE 2-5
+# TODO: EXERCISE 3-1
 
 def main():
     if len(sys.argv) < 2:
