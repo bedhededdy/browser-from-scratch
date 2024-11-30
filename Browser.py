@@ -42,9 +42,9 @@ class Browser:
         body = conn.request()
         if not url.view_source:
             self.nodes = HTMLParser(body).parse()
-            self.layout = Layout(self.nodes, self.width)
         else:
-            self.layout = Layout(Text(body, None), self.width)
+            self.nodes = Text(body, None)
+        self.layout = Layout(self.nodes, self.width)
         self.draw()
 
     def draw_scrollbar(self) -> None:

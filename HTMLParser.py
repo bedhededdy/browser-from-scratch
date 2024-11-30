@@ -65,19 +65,16 @@ class HTMLParser:
         if tag.startswith("/"):
             if len(self.unfinished) == 1: return
             node = self.unfinished.pop()
-            # parent = self.unfinished[-1]
-            parent = node.parent
-            parent.children.append(node)
         elif tag in self.SELF_CLOSING_TAGS:
             parent = self.unfinished[-1]
             node = Element(tag, attributes, parent)
             parent.children.append(node)
         else:
             parent = self.unfinished[-1] if self.unfinished else None
-            # FIXME: THIS MANGLES THE ORDER SUCH THAT THE INNER CHILDREN COME FIRST
             if parent and ((tag == "p" and parent.tag == "p") or (tag == "li" and parent.tag == "li")):
                 parent = parent.parent
             node = Element(tag, attributes, parent)
+            if parent: parent.children.append(node)
             self.unfinished.append(node)
         return False
 
@@ -114,12 +111,9 @@ class HTMLParser:
         if not self.unfinished:
             self.implicit_tags(None)
         while len(self.unfinished) > 1:
-            node = self.unfinished.pop()
-            # parent = self.unfinished[-1]
-            parent = node.parent
-            parent.children.append(node)
+            self.unfinished.pop()
         res = self.unfinished.pop()
-        print_tree(res)
+        # print_tree(res)
         return res
 
 def print_tree(node: Text | Element, indent=0):
