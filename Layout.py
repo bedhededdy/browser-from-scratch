@@ -68,8 +68,6 @@ class Layout:
             self.flush()
         self.line.append((self.cursor_x, word, font))
         self.cursor_x += w + font.measure(" ")
-        # FIXME: THIS IS NOT PROPERLY ACCOUNTING FOR THE LINE HEIGHTS
-        self.content_height = max(self.cursor_y, self.content_height)
 
     def flush(self) -> None:
         if not self.line: return
@@ -81,6 +79,7 @@ class Layout:
             self.display_list.append((x, y, word, font))
         max_descent = max(metric["descent"] for metric in metrics)
         self.cursor_y = baseline + 1.25 * max_descent
+        self.content_height = max(self.content_height, self.cursor_y)
         self.cursor_x = self.HSTEP
         self.line = []
 

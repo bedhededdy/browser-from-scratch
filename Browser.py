@@ -34,10 +34,6 @@ class Browser:
     def move_scroll(self, delta: int) -> None:
         self.scroll += delta
         if self.scroll < 0: self.scroll = 0
-        # FIXME: THIS COMPUTATION IS WRONG BECAUSE WE ARE CUTTING OFF THE BOTTOM OF THE PAGE
-        #        SO EITHER THIS OR THE CONTENT HEIGHT IS WRONG
-        #        I'M BETTING THAT THE CONTENT HEIGHT IS NOT PROPERLY ACCOUNTING FOR THE
-        #        US DRAWING AT THE NORTHWEST CORNER
         elif self.scroll + self.height > self.layout.content_height: self.scroll = max(self.layout.content_height - self.height, 0)
 
     def load(self, url: URL) -> None:
