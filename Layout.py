@@ -2,13 +2,13 @@ from typing import Dict, List, Tuple
 import tkinter
 import tkinter.font
 
-from Tag import Tag
+from Element import Element
 from Text import Text
 
 class Layout:
     HSTEP, VSTEP = 13, 18
 
-    def __init__(self, tokens: List[Tag | Text], browser_width: int):
+    def __init__(self, nodes: List[Element | Text], browser_width: int):
         self.display_list: List[Tuple[int, int, str, tkinter.font.Font]] = []
         self.line: List[Tuple[int, str, tkinter.font.Font]] = []
         self.fonts: Dict[Tuple[int, str, str]] = {}
@@ -18,40 +18,48 @@ class Layout:
         self.size = 12
         self.content_height = 0
 
-        for tok in tokens:
-            self.token(tok, browser_width)
+        # FIXME: WE CALL IT NODES, BUT ATM IT'S A SINGLE ELEMENT
+        self.recurse(nodes, browser_width)
 
         self.flush()
 
-    def token(self, token: Tag | Text, browser_width: int) -> None:
-        if isinstance(token, Text):
-            for word in token.text.split():
-                self.word(word, browser_width)
-        elif isinstance(token, Tag):
-            if token.tag == "i":
-                self.style = "italic"
-            elif token.tag == "/i":
-                self.style = "roman"
-            elif token.tag == "b":
-                self.weight = "bold"
-            elif token.tag == "/b":
-                self.weight = "normal"
-            elif token.tag == "small":
-                self.size -= 2
-            elif token.tag == "/small":
-                self.size += 2
-            elif token.tag == "big":
-                self.size += 4
-            elif token.tag == "/big":
-                self.size -= 4
-            elif token.tag == "br":
-                if self.line == []:
-                    self.cursor_y += self.VSTEP
-                else:
-                    self.flush()
-            elif token.tag == "/p":
-                self.flush()
+    def open_tag(self, tag: str) -> None:
+        if tag == "i":
+            self.style = "italic"
+        elif tag == "b":
+            self.weight = "bold"
+        elif tag == "small":
+            self.size -= 2
+        elif tag == "big":
+            self.size += 4
+        elif tag == "br":
+            if self.line == []:
                 self.cursor_y += self.VSTEP
+            else:
+                self.flush()
+
+    def close_tag(self, tag: str) -> None:
+        if tag == "/i":
+            self.style = "roman"
+        elif tag == "/b":
+            self.weight = "normal"
+        elif tag == "/small":
+            self.size += 2
+        elif tag == "/big":
+            self.size -= 4
+        elif tag == "/p":
+            self.flush()
+            self.cursor_y += self.VSTEP
+
+    def recurse(self, tree: Text | Element, browser_width: int) -> None:
+        if isinstance(tree, Text):
+            for word in tree.text.split():
+                self.word(word, browser_width)
+        elif isinstance(tree, Element):
+            self.open_tag(tree.tag)
+            for child in tree.children:
+                self.recurse(child, browser_width)
+            self.close_tag(tree.tag)
 
     def word(self, word: str, browser_width: int) -> None:
         font = self.get_font(self.size, self.weight, self.style)
@@ -60,6 +68,7 @@ class Layout:
             self.flush()
         self.line.append((self.cursor_x, word, font))
         self.cursor_x += w + font.measure(" ")
+        # FIXME: THIS IS NOT PROPERLY ACCOUNTING FOR THE LINE HEIGHTS
         self.content_height = max(self.cursor_y, self.content_height)
 
     def flush(self) -> None:

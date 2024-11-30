@@ -2,77 +2,11 @@ import platform
 import tkinter as tk
 from typing import List
 
+from HTMLParser import HTMLParser
 from HTTPConnection import HTTPConnection
 from HTTPRequestCache import HTTPRequestCache
 from Layout import Layout
-from Tag import Tag
-from Text import Text
 from URL import URL
-
-def lex(body: str, view_source: bool) -> List[Tag | Text]:
-    out = []
-    buffer = ""
-    in_tag = False
-    for c in body:
-        if c == "<":
-            # TODO: HAVE TO ADD THE ENTITY DETECTION BACK IN
-            #       (DO IT AFTER GETTING THE WHOLE ASS BUFFER)
-            in_tag = True
-            if buffer: out.append(Text(buffer))
-            buffer = ""
-        elif c == ">":
-            in_tag = False
-            out.append(Tag(buffer))
-            buffer = ""
-        else:
-            buffer += c
-    if not in_tag and buffer:
-        out.append(Text(buffer))
-    return out
-
-def __old_lex(body: str, view_source: bool) -> str:
-    if view_source:
-        return body
-    text = ""
-    in_tag = False
-    i = 0
-    while i < len(body):
-        c = body[i]
-        if c == "<":
-            in_tag = True
-        elif c == ">":
-            in_tag = False
-        elif not in_tag:
-            if c == "&":
-                entity = ""
-                i = i + 1
-                while i < len(body) and body[i] != " " and body[i] not in [";", "<"]:
-                    entity += body[i]
-                    i += 1
-                if i == len(body):
-                    # Should never happen in valid HTML
-                    break
-                elif body[i] == " ":
-                    # Wasn't an entity
-                    text += c + entity + " "
-                elif body[i] == "<":
-                    text += c + entity
-                    # Have to do this so that we hit the tag open in next
-                    # loop iteration
-                    i -= 1
-                elif body[i] == ";":
-                    # Potentially an entity
-                    if entity == "lt":
-                        text += "<"
-                    elif entity == "gt":
-                        text += ">"
-                    else:
-                        # Not a valid entity, so just print the raw text
-                        text += c + entity + ";"
-            else:
-                text += c
-        i += 1
-    return text
 
 class Browser:
     INITIAL_WIDTH, INITIAL_HEIGHT = 800, 600
@@ -100,13 +34,17 @@ class Browser:
     def move_scroll(self, delta: int) -> None:
         self.scroll += delta
         if self.scroll < 0: self.scroll = 0
+        # FIXME: THIS COMPUTATION IS WRONG BECAUSE WE ARE CUTTING OFF THE BOTTOM OF THE PAGE
+        #        SO EITHER THIS OR THE CONTENT HEIGHT IS WRONG
+        #        I'M BETTING THAT THE CONTENT HEIGHT IS NOT PROPERLY ACCOUNTING FOR THE
+        #        US DRAWING AT THE NORTHWEST CORNER
         elif self.scroll + self.height > self.layout.content_height: self.scroll = max(self.layout.content_height - self.height, 0)
 
     def load(self, url: URL) -> None:
         conn = HTTPConnection(url, HTTPRequestCache())
         body = conn.request()
-        self.tokens = lex(body, url.view_source)
-        self.layout = Layout(self.tokens, self.width)
+        self.nodes = HTMLParser(body).parse()
+        self.layout = Layout(self.nodes, self.width)
         self.draw()
 
     def draw_scrollbar(self) -> None:
@@ -157,5 +95,5 @@ class Browser:
     def resize(self, e: tk.Event) -> None:
         self.width = e.width
         self.height = e.height
-        self.layout = Layout(self.tokens, self.width)
+        self.layout = Layout(self.nodes, self.width)
         self.draw()
