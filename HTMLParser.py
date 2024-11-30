@@ -17,12 +17,17 @@ class HTMLParser:
     def __init__(self, body: str):
         self.body = body
         self.unfinished: List[Element] = []
+        # TODO: THIS SHOULDN'T BE A CLASS MEMBER
+        self.in_script = False
 
     def parse(self) -> Element:
         text = ""
         in_tag = False
-        for c in self.body:
+        for i, c in enumerate(self.body):
             if c == "<":
+                if (self.in_script and self.body[i+1:i+8] != "/script") or (in_tag and text.startswith("!--")):
+                    text += c
+                    continue
                 in_tag = True
                 if text: self.add_text(text)
                 text = ""
@@ -62,9 +67,13 @@ class HTMLParser:
                 return False
         tag, attributes = self.get_attributes(tag)
         self.implicit_tags(tag)
+        ret_val = self.in_script
         if tag.startswith("/"):
             if len(self.unfinished) == 1: return
-            node = self.unfinished.pop()
+            self.unfinished.pop()
+            if tag == "/script":
+                self.in_script = False
+                ret_val = False
         elif tag in self.SELF_CLOSING_TAGS:
             parent = self.unfinished[-1]
             node = Element(tag, attributes, parent)
@@ -76,7 +85,8 @@ class HTMLParser:
             node = Element(tag, attributes, parent)
             if parent: parent.children.append(node)
             self.unfinished.append(node)
-        return False
+            if tag == "script": self.in_script = True
+        return ret_val
 
     def get_attributes(self, text: str):
         parts = text.split()
