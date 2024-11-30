@@ -6,6 +6,7 @@ from HTMLParser import HTMLParser
 from HTTPConnection import HTTPConnection
 from HTTPRequestCache import HTTPRequestCache
 from Layout import Layout
+from Text import Text
 from URL import URL
 
 class Browser:
@@ -39,8 +40,11 @@ class Browser:
     def load(self, url: URL) -> None:
         conn = HTTPConnection(url, HTTPRequestCache())
         body = conn.request()
-        self.nodes = HTMLParser(body).parse()
-        self.layout = Layout(self.nodes, self.width)
+        if not url.view_source:
+            self.nodes = HTMLParser(body).parse()
+            self.layout = Layout(self.nodes, self.width)
+        else:
+            self.layout = Layout(Text(body, None), self.width)
         self.draw()
 
     def draw_scrollbar(self) -> None:

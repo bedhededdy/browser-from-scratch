@@ -8,7 +8,7 @@ from Text import Text
 class Layout:
     HSTEP, VSTEP = 13, 18
 
-    def __init__(self, nodes: List[Element | Text], browser_width: int):
+    def __init__(self, nodes: Element | Text, browser_width: int):
         self.display_list: List[Tuple[int, int, str, tkinter.font.Font]] = []
         self.line: List[Tuple[int, str, tkinter.font.Font]] = []
         self.fonts: Dict[Tuple[int, str, str]] = {}
