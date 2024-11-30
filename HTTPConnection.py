@@ -26,8 +26,6 @@ class HTTPConnection:
         return ""
 
     def __http_request(self, base_url: URL, nredirects = 0) -> str:
-        # TODO: NOT RESPECTING HTTP REQUEST CACHING POLICY
-
         if self.socket == None:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP)
             s.connect((self.url.host, self.url.port))
@@ -39,8 +37,7 @@ class HTTPConnection:
 
         if self.cache:
             cached_response = self.cache.get_cached_request(self.url)
-            # TODO: I THINK WE NEED TO EXPLICITLY CHECK FOR NULL VS EMPTY STRING
-            if cached_response:
+            if cached_response != None:
                 return cached_response
 
         request =  "GET {} HTTP/1.1\r\n".format(self.url.path)

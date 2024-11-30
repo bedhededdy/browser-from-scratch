@@ -19,6 +19,7 @@ class URL:
                 self.scheme = self.scheme[12:]
         else:
             # TODO: DOES VIEW-SOURCE WORK ON DATA URLS?
+            #       ANSWER: YES, AND WE DON'T HANDLE IT
             assert url.startswith("data:")
             self.scheme = "data"
             self.dtype, self.data = url[5:].split(",", 1)
@@ -44,9 +45,12 @@ class URL:
         return self.scheme == "https"
 
     def __str__(self) -> str:
-        # TODO: DOESN'T HANDLE VIEW-SOURCE
-        return "{}://{}:{}{}".format(self.scheme, self.host, self.port, self.path)
+        url_str = "{}://{}:{}{}".format(self.scheme, self.host, self.port, self.path)
+        if self.view_source:
+            url_str = "view-source:" + url_str
+        return url_str
 
     def __hash__(self) -> int:
         # TODO: CAN WE CACHE HTTP/HTTPS INTERCHANGEABLY?
+        #       I WOULD ARGUE YES, BUT FOR NOW LET'S NOT
         return hash((self.scheme, self.host, self.port, self.path))

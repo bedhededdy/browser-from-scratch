@@ -18,14 +18,11 @@ class HTMLParser:
         self.body = body
         self.unfinished: List[Element] = []
 
-    # TODO: RETURN TYPE
     def parse(self) -> Element:
         text = ""
         in_tag = False
         for c in self.body:
             if c == "<":
-                # TODO: HAVE TO ADD THE ENTITY DETECTION BACK IN
-                #       (DO IT AFTER GETTING THE WHOLE ASS BUFFER)
                 in_tag = True
                 if text: self.add_text(text)
                 text = ""
@@ -43,6 +40,8 @@ class HTMLParser:
         if text.isspace(): return
         self.implicit_tags(None)
         parent = self.unfinished[-1]
+        # TODO: HAVE TO ADD THE ENTITY DETECTION BACK IN
+        #       (DO IT AFTER GETTING THE WHOLE ASS BUFFER)
         node = Text(text, parent)
         parent.children.append(node)
 
