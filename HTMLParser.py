@@ -27,9 +27,11 @@ class HTMLParser:
                 if text: self.add_text(text)
                 text = ""
             elif c == ">":
-                in_tag = False
-                self.add_tag(text)
-                text = ""
+                if not self.add_tag(text):
+                    in_tag = False
+                    text = ""
+                else:
+                    text += c
             else:
                 text += c
         if not in_tag and text:
@@ -45,9 +47,20 @@ class HTMLParser:
         node = Text(text, parent)
         parent.children.append(node)
 
-    def add_tag(self, tag: str) -> None:
+    def add_tag(self, tag: str) -> bool:
+        if tag.startswith("!"):
+            if len(tag) == 3 and tag == "!--":
+                return True
+            elif tag.startswith("!--"):
+                if len(tag) == 4 and tag.endswith("--"):
+                    return True
+                elif tag.endswith("--"):
+                    return False
+                else:
+                    return True
+            else:
+                return False
         tag, attributes = self.get_attributes(tag)
-        if tag.startswith("!"): return
         self.implicit_tags(tag)
         if tag.startswith("/"):
             if len(self.unfinished) == 1: return
@@ -62,6 +75,7 @@ class HTMLParser:
             parent = self.unfinished[-1] if self.unfinished else None
             node = Element(tag, attributes, parent)
             self.unfinished.append(node)
+        return False
 
     def get_attributes(self, text: str):
         parts = text.split()
