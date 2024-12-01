@@ -23,15 +23,24 @@ class HTMLParser:
     def parse(self) -> Element:
         text = ""
         in_tag = False
+        in_attr_quotes = False
         for i, c in enumerate(self.body):
-            if c == "<":
+            if in_tag and c == "\"":
+                # The correct way to escape a quote in HTML
+                # is with &quot;, so we can safely assume
+                # that when we see a quote and we are in a tag
+                # that either this opens or closes an attribute
+                in_attr_quotes = not in_attr_quotes
+                if text.startswith("!--"): in_attr_quotes = False
+                text += c
+            elif c == "<" and not in_attr_quotes:
                 if (self.in_script and self.body[i+1:i+8] != "/script") or (in_tag and text.startswith("!--")):
                     text += c
                     continue
                 in_tag = True
                 if text: self.add_text(text)
                 text = ""
-            elif c == ">":
+            elif c == ">" and not in_attr_quotes:
                 if not self.add_tag(text):
                     in_tag = False
                     text = ""
@@ -65,6 +74,8 @@ class HTMLParser:
                     return True
             else:
                 return False
+        if tag != "/script" and self.in_script:
+            return True
         tag, attributes = self.get_attributes(tag)
         self.implicit_tags(tag)
         ret_val = self.in_script
@@ -88,14 +99,31 @@ class HTMLParser:
             if tag == "script": self.in_script = True
         return ret_val
 
+    def tokenize_tag(self, text: str) -> List[str]:
+        tokens = []
+        token = ""
+        in_quotes = False
+        for c in text:
+            if c == "\"":
+                in_quotes = not in_quotes
+                token += c
+            elif c.isspace() and not in_quotes:
+                if token: tokens.append(token)
+                token = ""
+            else:
+                token += c
+        if token: tokens.append(token)
+        return tokens
+
     def get_attributes(self, text: str):
-        parts = text.split()
-        tag = parts[0].casefold()
+        # TODO: THIS DOES NOT HANDLE SINGLE QUOTES, ONLY DOUBLE
+        tokens = self.tokenize_tag(text)
+        tag = tokens[0].casefold()
         attributes = {}
-        for attrpair in parts[1:]:
+        for attrpair in tokens[1:]:
             if "=" in attrpair:
                 key, value = attrpair.split("=", 1)
-                if len(value) > 2 and value[0] in ["'", "\""]:
+                if len(value) > 2 and value[0] == "\"":
                     value = value[1:-1]
                 attributes[key.casefold()] = value
             else:
@@ -123,7 +151,7 @@ class HTMLParser:
         while len(self.unfinished) > 1:
             self.unfinished.pop()
         res = self.unfinished.pop()
-        # print_tree(res)
+        print_tree(res)
         return res
 
 def print_tree(node: Text | Element, indent=0):
